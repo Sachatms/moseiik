@@ -38,8 +38,7 @@ docker-compose.yml
 out.png
 *.log
 
-# Rust specific
-Cargo.lock
-
-# Keep assets as they're needed for tests
+# Keep assets and Cargo files as they're needed
 !assets/
+!Cargo.toml
+!Cargo.lock
