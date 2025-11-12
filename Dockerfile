@@ -1,16 +1,28 @@
-# Dockerfile for moseiik - Multi-architecture mosaic image generator
-# Supports both x86_64 (linux/amd64) and aarch64 (linux/arm64) architectures
+# Dockerfile for moseiik - Multi-architecture Rust project
+# Supports x86_64 (amd64) and aarch64 (arm64) architectures
+
+FROM rust:latest AS builder
+
+WORKDIR /app
+
+# Copy dependency manifests first for better layer caching
+# This allows Docker to cache dependencies unless Cargo.toml/Cargo.lock changes
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+COPY tests ./tests
+COPY assets ./assets
+
+RUN cargo build --release
 
 FROM rust:latest
 
-# Set working directory
 WORKDIR /app
 
-# Copy project files
-COPY . .
+COPY --from=builder /app/Cargo.toml /app/Cargo.lock ./
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tests ./tests
+COPY --from=builder /app/assets ./assets
 
-# Build the project in release mode
-RUN cargo build --release
+COPY --from=builder /app/target ./target
 
-# Run tests by default when container starts
 ENTRYPOINT ["cargo", "test"]
