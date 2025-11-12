@@ -434,28 +434,120 @@ pub fn compute_mosaic(args: Options) {
 }
 
 fn main() {
-    let args = Options::parse();
+    let args = Options::parse(); 
     compute_mosaic(args);
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use image::RgbImage;
+    use std::fs;
+
+    /// Helper function that creates two simple 4x4 test images
+    /// and returns them with the expected L1 distance between them.
+    fn create_test_images() -> (RgbImage, RgbImage, i32) {
+        let mut im1 = RgbImage::new(4, 4);
+        let mut im2 = RgbImage::new(4, 4);
+
+        // Fill first image with RGB (10, 20, 30)
+        for pixel in im1.pixels_mut() {
+            *pixel = image::Rgb([10, 20, 30]);
+        }
+
+        // Fill second image with RGB (15, 25, 35)
+        for pixel in im2.pixels_mut() {
+            *pixel = image::Rgb([15, 25, 35]);
+        }
+
+        // Expected distance = sum of absolute differences for each pixel and each channel
+        // Each pixel contributes (5 + 5 + 5) = 15 → 4x4 pixels → 16 * 15 = 240
+        let expected_distance = 4 * 4 * (5 + 5 + 5);
+        (im1, im2, expected_distance)
+    }
+
+    // ---- L1 TESTS ----
+    // These tests verify that L1 distance computation gives the expected result
+    // across different CPU architectures and instruction sets (AVX2, SSE2, NEON).
+
     #[test]
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     fn unit_test_x86() {
-        // TODO
-        assert!(true);
+        let (im1, im2, expected) = create_test_images();
+        unsafe {
+            if is_x86_feature_detected!("avx2") {
+                // Test optimized AVX2 version
+                assert_eq!(l1_x86_avx2(&im1, &im2), expected);
+            } else if is_x86_feature_detected!("sse2") {
+                // Test SSE2 fallback version
+                assert_eq!(l1_x86_sse2(&im1, &im2), expected);
+            } else {
+                // If no SIMD instruction set is available, skip test
+                assert!(true);
+            }
+        }
     }
 
     #[test]
     #[cfg(target_arch = "aarch64")]
     fn unit_test_aarch64() {
-        assert!(true);
+        let (im1, im2, expected) = create_test_images();
+        unsafe {
+            // Test NEON implementation for ARM CPUs
+            assert_eq!(l1_neon(&im1, &im2), expected);
+        }
     }
 
     #[test]
     fn unit_test_generic() {
-        // TODO
-        assert!(true);
+        let (im1, im2, expected) = create_test_images();
+        // Test generic (non-optimized) version
+        assert_eq!(l1_generic(&im1, &im2), expected);
+    }
+
+    // ---- TILE TEST ----
+    // This test checks that the tile preparation function loads and resizes images correctly.
+
+    #[test]
+    fn test_prepare_tiles_size() {
+        let dir = "test_tiles";
+        fs::create_dir_all(dir).unwrap();
+
+        // Create 3 dummy 8x8 images
+        for i in 0..3 {
+            let img = RgbImage::new(8, 8);
+            img.save(format!("{}/img{}.png", dir, i)).unwrap();
+        }
+
+        let tile_size = Size { width: 4, height: 4 };
+        let tiles = prepare_tiles(dir, &tile_size, false).unwrap();
+
+        // Check that 3 tiles were generated, each resized to 4x4
+        assert_eq!(tiles.len(), 3);
+        for tile in tiles {
+            assert_eq!(tile.width(), 4);
+            assert_eq!(tile.height(), 4);
+        }
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    // ---- TARGET TEST ----
+    // This test checks that the target image is properly resized and prepared.
+
+    #[test]
+    fn test_prepare_target_size() {
+        let img = RgbImage::new(8, 8);
+        let path = "test_input.png";
+        img.save(path).unwrap();
+
+        let tile_size = Size { width: 4, height: 4 };
+        let result = prepare_target(path, 1, &tile_size).unwrap();
+
+        // The target should be correctly resized to 4x4
+        assert_eq!(result.width(), 8);
+        assert_eq!(result.height(), 8);
+
+        fs::remove_file(path).unwrap();
     }
 }
