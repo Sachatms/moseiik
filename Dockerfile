@@ -1,7 +1,7 @@
 # Dockerfile for moseiik - Multi-architecture Rust project
 # Supports x86_64 (amd64) and aarch64 (arm64) architectures
 
-FROM rust:latest AS builder
+FROM rust:1.83 AS builder
 
 WORKDIR /app
 
@@ -14,9 +14,13 @@ COPY assets ./assets
 
 RUN cargo build --release
 
-FROM rust:latest
+FROM rust:1.83
 
 WORKDIR /app
+
+# OCI metadata labels
+LABEL org.opencontainers.image.source="https://github.com/Sachatms/moseiik"
+LABEL org.opencontainers.image.description="Moseiik - Multi-architecture mosaic image generator"
 
 COPY --from=builder /app/Cargo.toml /app/Cargo.lock ./
 COPY --from=builder /app/src ./src
@@ -26,3 +30,4 @@ COPY --from=builder /app/assets ./assets
 COPY --from=builder /app/target ./target
 
 ENTRYPOINT ["cargo", "test"]
+CMD ["--release"]

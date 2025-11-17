@@ -31,8 +31,9 @@ docker-compose.yml
 # CI/CD
 .github/
 
-# Issues tracking
+# Project management
 0_issues/
+1_PR/
 
 # Output images (not needed for Docker build)
 out.png
