@@ -1,0 +1,45 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# GitHub
+.github
+
+# Build artifacts
+target/
+**/*.rs.bk
+*.pdb
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation (not needed for build)
+*.md
+!README.md
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# CI/CD
+.github/
+
+# Project management
+0_issues/
+1_PR/
+
+# Output images (not needed for Docker build)
+out.png
+*.log
+
+# Keep assets and Cargo files as they're needed
+!assets/
+!Cargo.toml
+!Cargo.lock
