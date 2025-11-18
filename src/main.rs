@@ -1,7 +1,7 @@
 use clap::Parser;
 use image::{
-    imageops::{resize, FilterType::Nearest},
     GenericImage, GenericImageView, ImageReader, RgbImage,
+    imageops::{FilterType::Nearest, resize},
 };
 use std::time::Instant;
 use std::{
@@ -127,7 +127,6 @@ unsafe fn l1_x86_avx2(im1: &RgbImage, im2: &RgbImage) -> i32 {
     use std::arch::x86_64::{
         __m256i,
         _mm256_extract_epi16, //AVX2
-        _mm256_load_si256,    //AVX
         _mm256_loadu_si256,   //AVX
         _mm256_sad_epu8,      //AVX2
     };
@@ -151,7 +150,7 @@ unsafe fn l1_x86_avx2(im1: &RgbImage, im2: &RgbImage) -> i32 {
 
         // Load data to ymm
         let ymm_p1 = _mm256_loadu_si256(p_im1);
-        let ymm_p2 = _mm256_load_si256(p_im2);
+        let ymm_p2 = _mm256_loadu_si256(p_im2);
 
         // Do abs(a-b) and horizontal add, results are stored in lower 16 bits of each 64 bits groups
         let ymm_sub_abs = _mm256_sad_epu8(ymm_p1, ymm_p2);
@@ -184,7 +183,7 @@ unsafe fn l1_x86_sse2(im1: &RgbImage, im2: &RgbImage) -> i32 {
     use std::arch::x86_64::{
         __m128i,
         _mm_extract_epi16, //SSE2
-        _mm_load_si128,    //SSE2
+        _mm_loadu_si128,   //SSE2
         _mm_sad_epu8,      //SSE2
     };
 
@@ -206,8 +205,8 @@ unsafe fn l1_x86_sse2(im1: &RgbImage, im2: &RgbImage) -> i32 {
             std::mem::transmute::<*const u8, *const __m128i>(std::ptr::addr_of!(im2[i as usize]));
 
         // Load data to xmm
-        let xmm_p1 = _mm_load_si128(p_im1);
-        let xmm_p2 = _mm_load_si128(p_im2);
+        let xmm_p1 = _mm_loadu_si128(p_im1);
+        let xmm_p2 = _mm_loadu_si128(p_im2);
 
         // Do abs(a-b) and horizontal add, results are stored in lower 16 bits of each 64 bits groups
         let xmm_sub_abs = _mm_sad_epu8(xmm_p1, xmm_p2);
@@ -440,22 +439,165 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use image::RgbImage;
+    use std::fs;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    // Helper to create test images
+    fn create_test_images() -> (RgbImage, RgbImage, i32) {
+        let mut im1 = RgbImage::new(4, 4);
+        let mut im2 = RgbImage::new(4, 4);
+        im1.pixels_mut().for_each(|p| *p = image::Rgb([10, 20, 30]));
+        im2.pixels_mut().for_each(|p| *p = image::Rgb([15, 25, 35]));
+        let expected_distance = 4 * 4 * (5 + 5 + 5);
+        (im1, im2, expected_distance)
+    }
+
+    // === Basic L1 Distance Tests ===
+
     #[test]
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     fn unit_test_x86() {
-        // TODO
-        assert!(true);
+        let (im1, im2, expected) = create_test_images();
+        unsafe {
+            if is_x86_feature_detected!("avx2") {
+                assert_eq!(l1_x86_avx2(&im1, &im2), expected);
+            } else if is_x86_feature_detected!("sse2") {
+                assert_eq!(l1_x86_sse2(&im1, &im2), expected);
+            } else {
+                panic!("No SIMD support detected on x86 platform - expected at least SSE2");
+            }
+        }
     }
 
     #[test]
     #[cfg(target_arch = "aarch64")]
     fn unit_test_aarch64() {
-        assert!(true);
+        let (im1, im2, expected) = create_test_images();
+        unsafe {
+            assert_eq!(l1_neon(&im1, &im2), expected);
+        }
     }
 
     #[test]
     fn unit_test_generic() {
-        // TODO
-        assert!(true);
+        let (im1, im2, expected) = create_test_images();
+        assert_eq!(l1_generic(&im1, &im2), expected);
+    }
+
+    // === Edge Case Tests ===
+
+    #[test]
+    fn test_l1_generic_identical_images() {
+        let mut im1 = RgbImage::new(8, 8);
+        let mut im2 = RgbImage::new(8, 8);
+        im1.pixels_mut()
+            .for_each(|p| *p = image::Rgb([100, 150, 200]));
+        im2.pixels_mut()
+            .for_each(|p| *p = image::Rgb([100, 150, 200]));
+        assert_eq!(l1_generic(&im1, &im2), 0);
+    }
+
+    #[test]
+    fn test_l1_generic_minimal_image() {
+        let mut im1 = RgbImage::new(1, 1);
+        let mut im2 = RgbImage::new(1, 1);
+        im1.put_pixel(0, 0, image::Rgb([10, 20, 30]));
+        im2.put_pixel(0, 0, image::Rgb([15, 25, 35]));
+        assert_eq!(l1_generic(&im1, &im2), 15);
+    }
+
+    #[test]
+    fn test_l1_generic_max_difference() {
+        let mut im1 = RgbImage::new(2, 2);
+        let mut im2 = RgbImage::new(2, 2);
+        im1.pixels_mut().for_each(|p| *p = image::Rgb([0, 0, 0]));
+        im2.pixels_mut()
+            .for_each(|p| *p = image::Rgb([255, 255, 255]));
+        let expected = 2 * 2 * (255 + 255 + 255);
+        assert_eq!(l1_generic(&im1, &im2), expected);
+    }
+
+    // === Prepare Functions Tests ===
+
+    /// RAII guard to ensure cleanup of test directories
+    struct DirCleanup {
+        path: String,
+    }
+
+    impl DirCleanup {
+        fn new(path: String) -> Self {
+            Self { path }
+        }
+    }
+
+    impl Drop for DirCleanup {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    /// RAII guard to ensure cleanup of test files
+    struct FileCleanup {
+        path: String,
+    }
+
+    impl FileCleanup {
+        fn new(path: String) -> Self {
+            Self { path }
+        }
+    }
+
+    impl Drop for FileCleanup {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+
+    #[test]
+    fn test_prepare_tiles_size() {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let id = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let dir = format!("test_tiles_{}", id);
+        let _cleanup = DirCleanup::new(dir.clone());
+
+        fs::create_dir_all(&dir).unwrap();
+        for i in 0..3 {
+            let img = RgbImage::new(8, 8);
+            img.save(format!("{}/img{}.png", dir, i)).unwrap();
+        }
+
+        let tile_size = Size {
+            width: 4,
+            height: 4,
+        };
+        let tiles = prepare_tiles(&dir, &tile_size, false).unwrap();
+
+        assert_eq!(tiles.len(), 3);
+        for tile in tiles {
+            assert_eq!(tile.width(), 4);
+            assert_eq!(tile.height(), 4);
+        }
+    }
+
+    #[test]
+    fn test_prepare_target_size() {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let id = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let path = format!("test_input_{}.png", id);
+        let _cleanup = FileCleanup::new(path.clone());
+
+        let img = RgbImage::new(8, 8);
+        img.save(&path).unwrap();
+
+        let tile_size = Size {
+            width: 4,
+            height: 4,
+        };
+        let result = prepare_target(&path, 1, &tile_size).unwrap();
+
+        assert_eq!(result.width(), 8);
+        assert_eq!(result.height(), 8);
     }
 }
