@@ -38,8 +38,18 @@ docker-compose.yml
 # Output images (not needed for Docker build)
 out.png
 *.log
+test_verification.png
 
-# Keep assets and Cargo files as they're needed
-!assets/
+# Exclude large image database (713MB) - not needed for CI
+# Integration tests use target-small.png + tiles-small instead
+assets/images/
+assets/ground-truth-kit.png
+assets/kit.jpeg
+
+# Keep essential small test assets
+!assets/target-small.png
+!assets/tiles-small/
+
+# Keep Cargo files as they're needed
 !Cargo.toml
 !Cargo.lock
