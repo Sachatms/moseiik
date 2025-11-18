@@ -1,6 +1,23 @@
 use moseiik::main::compute_mosaic;
-use std::fs;
-use std::path::Path;
+
+/// RAII guard to ensure cleanup of test output files
+struct TestCleanup {
+    path: String,
+}
+
+impl TestCleanup {
+    fn new(path: &str) -> Self {
+        Self {
+            path: path.to_string(),
+        }
+    }
+}
+
+impl Drop for TestCleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
 
 /// Integration test for x86/x86_64 SIMD implementation
 /// Uses large image to test complete pipeline with SSE2/AVX2
@@ -9,9 +26,8 @@ use std::path::Path;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 fn test_x86() {
     let output = "test_output_x86.png";
+    let _cleanup = TestCleanup::new(output);
     run_integration_test(true, output);
-    assert!(Path::new(output).exists(), "Output file should exist");
-    cleanup(output);
 }
 
 /// Integration test for ARM NEON SIMD implementation
@@ -21,9 +37,8 @@ fn test_x86() {
 #[cfg(target_arch = "aarch64")]
 fn test_aarch64() {
     let output = "test_output_aarch64.png";
+    let _cleanup = TestCleanup::new(output);
     run_integration_test(true, output);
-    assert!(Path::new(output).exists(), "Output file should exist");
-    cleanup(output);
 }
 
 /// Integration test for generic (non-SIMD) implementation
@@ -32,9 +47,8 @@ fn test_aarch64() {
 #[ignore] // Slow test - run with: cargo test -- --ignored
 fn test_generic() {
     let output = "test_output_generic.png";
+    let _cleanup = TestCleanup::new(output);
     run_integration_test(false, output);
-    assert!(Path::new(output).exists(), "Output file should exist");
-    cleanup(output);
 }
 
 /// Helper function for integration tests
@@ -56,13 +70,18 @@ fn run_integration_test(use_simd: bool, output_path: &str) {
     compute_mosaic(args);
 
     // Verify output exists and dimensions are reasonable
+    // Note: These dimensions are specific to assets/kit.jpeg (1920x1080)
+    // with 25x25 tiles. The mosaic algorithm may adjust final dimensions
+    // to multiples of tile size (1920/25=76.8 -> 76 tiles * 25 = 1900px width).
     let output_img = image::open(output_path).expect("Failed to open output");
-    // Mosaic tiles may adjust final dimensions slightly
-    assert!(output_img.width() >= 1900 && output_img.width() <= 1920);
-    assert!(output_img.height() >= 1050 && output_img.height() <= 1080);
-}
-
-/// Cleanup helper
-fn cleanup(path: &str) {
-    let _ = fs::remove_file(path);
+    assert!(
+        output_img.width() >= 1900 && output_img.width() <= 1920,
+        "Output width {} is outside expected range [1900-1920]",
+        output_img.width()
+    );
+    assert!(
+        output_img.height() >= 1050 && output_img.height() <= 1080,
+        "Output height {} is outside expected range [1050-1080]",
+        output_img.height()
+    );
 }

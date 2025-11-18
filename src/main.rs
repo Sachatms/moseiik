@@ -465,6 +465,8 @@ mod tests {
                 assert_eq!(l1_x86_avx2(&im1, &im2), expected);
             } else if is_x86_feature_detected!("sse2") {
                 assert_eq!(l1_x86_sse2(&im1, &im2), expected);
+            } else {
+                panic!("No SIMD support detected on x86 platform - expected at least SSE2");
             }
         }
     }
@@ -519,11 +521,46 @@ mod tests {
 
     // === Prepare Functions Tests ===
 
+    /// RAII guard to ensure cleanup of test directories
+    struct DirCleanup {
+        path: String,
+    }
+
+    impl DirCleanup {
+        fn new(path: String) -> Self {
+            Self { path }
+        }
+    }
+
+    impl Drop for DirCleanup {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    /// RAII guard to ensure cleanup of test files
+    struct FileCleanup {
+        path: String,
+    }
+
+    impl FileCleanup {
+        fn new(path: String) -> Self {
+            Self { path }
+        }
+    }
+
+    impl Drop for FileCleanup {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+
     #[test]
     fn test_prepare_tiles_size() {
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let id = COUNTER.fetch_add(1, Ordering::SeqCst);
         let dir = format!("test_tiles_{}", id);
+        let _cleanup = DirCleanup::new(dir.clone());
 
         fs::create_dir_all(&dir).unwrap();
         for i in 0..3 {
@@ -542,8 +579,6 @@ mod tests {
             assert_eq!(tile.width(), 4);
             assert_eq!(tile.height(), 4);
         }
-
-        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
@@ -551,6 +586,7 @@ mod tests {
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let id = COUNTER.fetch_add(1, Ordering::SeqCst);
         let path = format!("test_input_{}.png", id);
+        let _cleanup = FileCleanup::new(path.clone());
 
         let img = RgbImage::new(8, 8);
         img.save(&path).unwrap();
@@ -563,7 +599,5 @@ mod tests {
 
         assert_eq!(result.width(), 8);
         assert_eq!(result.height(), 8);
-
-        fs::remove_file(&path).unwrap();
     }
 }
