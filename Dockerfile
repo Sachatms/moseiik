@@ -15,17 +15,15 @@ RUN mkdir src && \
     cargo build --release && \
     rm -rf src
 
-# Copy actual source code and assets
+# Copy actual source code
 COPY src ./src
 COPY tests ./tests
-COPY assets ./assets
 
 # Build tests in release mode (cached if source unchanged)
 RUN cargo build --release --tests
 
 # Note: moseiik_test_images dataset is mounted at runtime via -v flag
-# This allows the image to be built without requiring the large dataset
-# and makes the ground-truth test optional
+# All tests use this dataset (no assets/ directory needed in the image)
 
 # ENTRYPOINT allows passing test filters as arguments
 # Example: docker run moseiik test_ground_truth_kit

@@ -42,6 +42,11 @@ jobs:
           wget -q https://nasext-vaader.insa-rennes.fr/ietr-vaader/moseiik_test_images.zip
           unzip -q moseiik_test_images.zip
           rm moseiik_test_images.zip
+          # The zip should contain: kit.jpeg, output.jpeg, and images/ directory
+          echo "Extracted files:"
+          ls -la moseiik_test_images/
+          echo "Sample of tiles:"
+          ls moseiik_test_images/images/ | head -10
 
       # QEMU is only needed for ARM builds on x86 runners
       # It provides CPU emulation allowing ARM binaries to run on x86 hardware
@@ -69,11 +74,17 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=min,scope=${{ matrix.arch }}
 
-      # Run all tests including the ground-truth verification test
-      # The '--' separator in ENTRYPOINT allows passing test filters
-      # We use '--include-ignored' to run the ground-truth test that's normally ignored
-      - name: Run tests (unit + integration)
-        run: docker run --rm --platform ${{ matrix.platform }} -v $PWD/moseiik_test_images:/app/moseiik_test_images moseiik:test-${{ matrix.arch }}
+      # Verify test dataset was downloaded correctly
+      - name: Verify test dataset
+        run: |
+          echo "Checking moseiik_test_images directory..."
+          ls -la moseiik_test_images/
+          echo "Sample of tiles:"
+          ls moseiik_test_images/images/ | head -10
+          echo "Total tile count:"
+          ls -1 moseiik_test_images/images/ | wc -l
 
-      - name: Run ground-truth verification test
-        run: docker run --rm --platform ${{ matrix.platform }} -v $PWD/moseiik_test_images:/app/moseiik_test_images moseiik:test-${{ matrix.arch }} --ignored test_ground_truth_kit
+      # Run all integration tests (generic, x86/SSE2/AVX2, or ARM/NEON depending on platform)
+      # All tests use the moseiik_test_images dataset and verify against output.jpeg
+      - name: Run integration tests
+        run: docker run --rm --platform ${{ matrix.platform }} -v "${{ github.workspace }}/moseiik_test_images:/app/moseiik_test_images" moseiik:test-${{ matrix.arch }}

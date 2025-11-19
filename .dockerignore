@@ -40,17 +40,12 @@ out.png
 *.log
 test_verification.png
 
-# Exclude large image database (713MB) - not needed for CI
-# Integration tests use target-small.png + tiles-small instead
-assets/images/
+# Exclude assets directory entirely - not needed for tests
+# All tests use moseiik_test_images/ (mounted at runtime)
+assets/
 
-# Keep ground-truth test assets (needed for CI ground-truth verification)
-# assets/ground-truth-kit.png - NEEDED for test
-# assets/kit.jpeg - NEEDED for test
-
-# Keep essential small test assets
-!assets/target-small.png
-!assets/tiles-small/
+# Exclude test dataset from Docker image (mounted at runtime instead)
+moseiik_test_images/
 
 # Keep Cargo files as they're needed
 !Cargo.toml

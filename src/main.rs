@@ -61,9 +61,9 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
-            image: String::from("assets/target-small.png"),
+            image: String::from("moseiik_test_images/kit.jpeg"),
             output: String::from("out.png"),
-            tiles: String::from("assets/tiles-small"),
+            tiles: String::from("moseiik_test_images/images"),
             scaling: 1,
             tile_size: 5,
             remove_used: false,
