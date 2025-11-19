@@ -1,3 +1,4 @@
+#[path = "main.rs"]
 pub mod main;
 
 // Re-export public items for easier access from integration tests

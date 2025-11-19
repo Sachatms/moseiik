@@ -1,4 +1,4 @@
-use moseiik::main::compute_mosaic;
+use moseiik::{Options, compute_mosaic};
 
 /// RAII guard to ensure cleanup of test output files
 struct TestCleanup {
@@ -51,8 +51,6 @@ fn test_generic() {
 /// Helper function for integration tests
 /// Uses small test data (tiles-small, target-small.png) for fast CI testing
 fn run_integration_test(use_simd: bool, output_path: &str) {
-    use moseiik::main::Options;
-
     let args = Options {
         image: "assets/target-small.png".to_string(),
         tiles: "assets/tiles-small".to_string(),

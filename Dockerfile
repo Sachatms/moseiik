@@ -7,9 +7,11 @@ WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
 
+# Create dummy source to build dependencies only
+# Note: Dummy lib.rs must match the structure to avoid re-compilation
 RUN mkdir -p src tests && \
     echo "pub fn main() {}" > src/main.rs && \
-    echo "pub mod main;" > src/lib.rs && \
+    echo "// Dummy lib for dependency caching" > src/lib.rs && \
     echo "" > tests/temp.rs && \
     cargo build --release && \
     rm -rf src tests
