@@ -41,7 +41,7 @@ jobs:
         run: |
           wget -q https://nasext-vaader.insa-rennes.fr/ietr-vaader/moseiik_test_images.zip
           unzip -q moseiik_test_images.zip
-          rm moseiik_test_images.zip
+          rm moseiik_test_images.zip -d moseiik_test_images
           # The zip should contain: kit.jpeg, output.jpeg, and images/ directory
           echo "Extracted files:"
           ls -la moseiik_test_images/
