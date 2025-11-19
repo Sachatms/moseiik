@@ -10,34 +10,67 @@ jobs:
   test:
     name: Test on ${{ matrix.platform }}
     runs-on: ubuntu-latest
+    # ARM emulation via QEMU is significantly slower than native x86
+    # Allow up to 60 minutes to ensure tests complete on both architectures
     timeout-minutes: 60
     strategy:
-      fail-fast: true  # to optimize resource usage
+      # Stop early if one platform fails to save CI minutes and provide faster feedback
+      fail-fast: true
       matrix:
         platform:
-          - linux/amd64
-          - linux/arm64
+          - linux/amd64  # Native x86_64 execution on GitHub runners
+          - linux/arm64  # Emulated ARM via QEMU (slower but ensures cross-platform compatibility)
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Download and cache the test images dataset for ground-truth verification
+      # The dataset is ~100MB and contains tiles needed for integration tests
+      - name: Cache test images dataset
+        id: cache-tiles
+        uses: actions/cache@v4
+        with:
+          path: moseiik_test_images
+          key: moseiik-test-images-v1
+
+      - name: Download test images dataset
+        if: steps.cache-tiles.outputs.cache-hit != 'true'
+        run: |
+          wget -q https://nasext-vaader.insa-rennes.fr/ietr-vaader/moseiik_test_images.zip
+          unzip -q moseiik_test_images.zip
+          rm moseiik_test_images.zip
+
+      # QEMU is only needed for ARM builds on x86 runners
+      # It provides CPU emulation allowing ARM binaries to run on x86 hardware
       - name: Set up QEMU
         if: matrix.platform == 'linux/arm64'
         uses: docker/setup-qemu-action@v3
 
+      # Buildx enables multi-platform Docker builds
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Build Docker image for the target platform
+      # Uses GitHub Actions cache to speed up subsequent builds
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          tags: moseiik:test
+          tags: moseiik:test-${{ matrix.platform }}
+          # Export to Docker daemon for local testing
+          # Note: This works with QEMU for cross-platform builds
           load: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # GitHub Actions cache dramatically improves build times
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
 
-      - name: Run tests
-        run: docker run --rm --platform ${{ matrix.platform }} moseiik:test
+      # Run all tests including the ground-truth verification test
+      # The '--' separator in ENTRYPOINT allows passing test filters
+      # We use '--include-ignored' to run the ground-truth test that's normally ignored
+      - name: Run tests (unit + integration)
+        run: docker run --rm --platform ${{ matrix.platform }} moseiik:test-${{ matrix.platform }}
+
+      - name: Run ground-truth verification test
+        run: docker run --rm --platform ${{ matrix.platform }} moseiik:test-${{ matrix.platform }} --ignored test_ground_truth_kit

@@ -52,21 +52,18 @@ fn test_generic() {
 /// Uses small test data (tiles-small, target-small.png) for fast CI testing
 fn run_integration_test(use_simd: bool, output_path: &str) {
     let args = Options {
-        image: "assets/target-small.png".to_string(),
-        tiles: "assets/tiles-small".to_string(),
-        tile_size: 5,
         output: output_path.to_string(),
-        verbose: false,
-        scaling: 1,
         num_thread: 4,
         simd: use_simd,
-        remove_used: false,
+        ..Default::default()
     };
 
     compute_mosaic(args);
 
     // Verify output exists and can be loaded
-    let output_img = image::open(output_path).expect("Failed to open output");
+    let output_img = image::open(output_path)
+        .expect("Failed to open output")
+        .into_rgb8();
 
     // The target-small.png should be reconstructed perfectly since tiles-small
     // contains the exact tiles from the original image
@@ -74,15 +71,58 @@ fn run_integration_test(use_simd: bool, output_path: &str) {
         .expect("Failed to open target")
         .into_rgb8();
 
-    // Verify dimensions match (should be exact since tiles divide evenly)
+    // Pixel-perfect comparison - tiles-small should reconstruct target-small exactly
     assert_eq!(
-        output_img.width(),
-        target_img.width(),
-        "Output width doesn't match target"
+        output_img, target_img,
+        "Output should be pixel-perfect identical to target for tiles-small dataset"
     );
+}
+
+/// Integration test for ground truth verification with full dataset
+/// Tests complete pipeline with kit.jpeg and downloaded tiles
+/// This test is ignored by default as it requires downloading the test images dataset
+#[test]
+#[ignore]
+fn test_ground_truth_kit() {
+    // Check if downloaded tiles exist
+    let tiles_path = "moseiik_test_images";
+    if !std::path::Path::new(tiles_path).exists() {
+        eprintln!(
+            "⚠️  Skipping ground truth test - tiles not found at '{}'",
+            tiles_path
+        );
+        eprintln!(
+            "   Download from: https://nasext-vaader.insa-rennes.fr/ietr-vaader/moseiik_test_images.zip"
+        );
+        return;
+    }
+
+    let output = "test_ground_truth.png";
+    let _cleanup = TestCleanup::new(output);
+
+    let args = Options {
+        image: "assets/kit.jpeg".to_string(),
+        tiles: tiles_path.to_string(),
+        tile_size: 25,
+        scaling: 1,
+        output: output.to_string(),
+        num_thread: 4,
+        simd: true,
+        ..Default::default()
+    };
+
+    compute_mosaic(args);
+
+    let output_img = image::open(output)
+        .expect("Failed to open generated output")
+        .into_rgb8();
+    let ground_truth = image::open("assets/ground-truth-kit.png")
+        .expect("Failed to open ground truth image")
+        .into_rgb8();
+
+    // Pixel-perfect comparison against known ground truth
     assert_eq!(
-        output_img.height(),
-        target_img.height(),
-        "Output height doesn't match target"
+        output_img, ground_truth,
+        "Generated mosaic should be pixel-perfect identical to ground truth"
     );
 }

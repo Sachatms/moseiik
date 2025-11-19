@@ -58,6 +58,22 @@ pub struct Options {
     pub num_thread: usize,
 }
 
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            image: String::from("assets/target-small.png"),
+            output: String::from("out.png"),
+            tiles: String::from("assets/tiles-small"),
+            scaling: 1,
+            tile_size: 5,
+            remove_used: false,
+            verbose: false,
+            simd: false,
+            num_thread: 1,
+        }
+    }
+}
+
 fn count_available_tiles(images_folder: &str) -> i32 {
     match fs::read_dir(images_folder) {
         Ok(t) => return t.count() as i32,
