@@ -1,4 +1,4 @@
-use moseiik::main::compute_mosaic;
+use moseiik::{Options, compute_mosaic};
 
 /// RAII guard to ensure cleanup of test output files
 struct TestCleanup {
@@ -20,9 +20,8 @@ impl Drop for TestCleanup {
 }
 
 /// Integration test for x86/x86_64 SIMD implementation
-/// Uses large image to test complete pipeline with SSE2/AVX2
+/// Tests complete pipeline with small dataset (target-small.png + tiles-small)
 #[test]
-#[ignore] // Slow test - run with: cargo test -- --ignored
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 fn test_x86() {
     let output = "test_output_x86.png";
@@ -31,9 +30,8 @@ fn test_x86() {
 }
 
 /// Integration test for ARM NEON SIMD implementation
-/// Uses large image to test complete pipeline with NEON
+/// Tests complete pipeline with small dataset (target-small.png + tiles-small)
 #[test]
-#[ignore] // Slow test - run with: cargo test -- --ignored
 #[cfg(target_arch = "aarch64")]
 fn test_aarch64() {
     let output = "test_output_aarch64.png";
@@ -42,9 +40,8 @@ fn test_aarch64() {
 }
 
 /// Integration test for generic (non-SIMD) implementation
-/// Uses large image to test complete pipeline without SIMD
+/// Tests complete pipeline with small dataset (target-small.png + tiles-small)
 #[test]
-#[ignore] // Slow test - run with: cargo test -- --ignored
 fn test_generic() {
     let output = "test_output_generic.png";
     let _cleanup = TestCleanup::new(output);
@@ -52,13 +49,12 @@ fn test_generic() {
 }
 
 /// Helper function for integration tests
+/// Uses small test data (tiles-small, target-small.png) for fast CI testing
 fn run_integration_test(use_simd: bool, output_path: &str) {
-    use moseiik::main::Options;
-
     let args = Options {
-        image: "assets/kit.jpeg".to_string(),
-        tiles: "assets/images".to_string(),
-        tile_size: 25,
+        image: "assets/target-small.png".to_string(),
+        tiles: "assets/tiles-small".to_string(),
+        tile_size: 5,
         output: output_path.to_string(),
         verbose: false,
         scaling: 1,
@@ -69,19 +65,24 @@ fn run_integration_test(use_simd: bool, output_path: &str) {
 
     compute_mosaic(args);
 
-    // Verify output exists and dimensions are reasonable
-    // Note: These dimensions are specific to assets/kit.jpeg (1920x1080)
-    // with 25x25 tiles. The mosaic algorithm may adjust final dimensions
-    // to multiples of tile size (1920/25=76.8 -> 76 tiles * 25 = 1900px width).
+    // Verify output exists and can be loaded
     let output_img = image::open(output_path).expect("Failed to open output");
-    assert!(
-        output_img.width() >= 1900 && output_img.width() <= 1920,
-        "Output width {} is outside expected range [1900-1920]",
-        output_img.width()
+
+    // The target-small.png should be reconstructed perfectly since tiles-small
+    // contains the exact tiles from the original image
+    let target_img = image::open("assets/target-small.png")
+        .expect("Failed to open target")
+        .into_rgb8();
+
+    // Verify dimensions match (should be exact since tiles divide evenly)
+    assert_eq!(
+        output_img.width(),
+        target_img.width(),
+        "Output width doesn't match target"
     );
-    assert!(
-        output_img.height() >= 1050 && output_img.height() <= 1080,
-        "Output height {} is outside expected range [1050-1080]",
-        output_img.height()
+    assert_eq!(
+        output_img.height(),
+        target_img.height(),
+        "Output height doesn't match target"
     );
 }

@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']  # Trigger on all branches
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: true  # to optimize resource usage
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        if: matrix.platform == 'linux/arm64'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          tags: moseiik:test
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run tests
+        run: docker run --rm --platform ${{ matrix.platform }} moseiik:test
