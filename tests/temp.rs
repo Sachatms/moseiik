@@ -120,9 +120,19 @@ fn test_ground_truth_kit() {
         .expect("Failed to open ground truth image")
         .into_rgb8();
 
+    // Verify dimensions first
+    assert_eq!(
+        output_img.dimensions(),
+        ground_truth.dimensions(),
+        "Image dimensions don't match! Output: {:?}, Ground truth: {:?}",
+        output_img.dimensions(),
+        ground_truth.dimensions()
+    );
+
     // Pixel-perfect comparison against known ground truth
     assert_eq!(
         output_img, ground_truth,
-        "Generated mosaic should be pixel-perfect identical to ground truth"
+        "Generated mosaic should be pixel-perfect identical to ground truth. \
+         Dimensions match but pixel values differ."
     );
 }
