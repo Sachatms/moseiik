@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: Test on ${{ matrix.platform }}
+    name: Test on ${{ matrix.arch }}
     runs-on: ubuntu-latest
     # ARM emulation via QEMU is significantly slower than native x86
     # Allow up to 60 minutes to ensure tests complete on both architectures
@@ -17,9 +17,11 @@ jobs:
       # Stop early if one platform fails to save CI minutes and provide faster feedback
       fail-fast: true
       matrix:
-        platform:
-          - linux/amd64  # Native x86_64 execution on GitHub runners
-          - linux/arm64  # Emulated ARM via QEMU (slower but ensures cross-platform compatibility)
+        include:
+          - platform: linux/amd64
+            arch: amd64
+          - platform: linux/arm64
+            arch: arm64
 
     steps:
       - name: Checkout code
@@ -44,7 +46,7 @@ jobs:
       # QEMU is only needed for ARM builds on x86 runners
       # It provides CPU emulation allowing ARM binaries to run on x86 hardware
       - name: Set up QEMU
-        if: matrix.platform == 'linux/arm64'
+        if: matrix.arch == 'arm64'
         uses: docker/setup-qemu-action@v3
 
       # Buildx enables multi-platform Docker builds
@@ -58,19 +60,19 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          tags: moseiik:test-${{ matrix.platform }}
+          tags: moseiik:test-${{ matrix.arch }}
           # Export to Docker daemon for local testing
           # Note: This works with QEMU for cross-platform builds
           load: true
           # GitHub Actions cache dramatically improves build times
-          cache-from: type=gha,scope=${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
 
       # Run all tests including the ground-truth verification test
       # The '--' separator in ENTRYPOINT allows passing test filters
       # We use '--include-ignored' to run the ground-truth test that's normally ignored
       - name: Run tests (unit + integration)
-        run: docker run --rm --platform ${{ matrix.platform }} moseiik:test-${{ matrix.platform }}
+        run: docker run --rm --platform ${{ matrix.platform }} moseiik:test-${{ matrix.arch }}
 
       - name: Run ground-truth verification test
-        run: docker run --rm --platform ${{ matrix.platform }} moseiik:test-${{ matrix.platform }} --ignored test_ground_truth_kit
+        run: docker run --rm --platform ${{ matrix.platform }} moseiik:test-${{ matrix.arch }} --ignored test_ground_truth_kit
