@@ -23,9 +23,9 @@ COPY assets ./assets
 # Build tests in release mode (cached if source unchanged)
 RUN cargo build --release --tests
 
-# Copy test images dataset if available (downloaded in CI)
-# If not present, the ground-truth test will be skipped gracefully
-COPY moseiik_test_images ./moseiik_test_images
+# Note: moseiik_test_images dataset is mounted at runtime via -v flag
+# This allows the image to be built without requiring the large dataset
+# and makes the ground-truth test optional
 
 # ENTRYPOINT allows passing test filters as arguments
 # Example: docker run moseiik test_ground_truth_kit

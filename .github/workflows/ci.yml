@@ -72,7 +72,7 @@ jobs:
       # The '--' separator in ENTRYPOINT allows passing test filters
       # We use '--include-ignored' to run the ground-truth test that's normally ignored
       - name: Run tests (unit + integration)
-        run: docker run --rm --platform ${{ matrix.platform }} moseiik:test-${{ matrix.arch }}
+        run: docker run --rm --platform ${{ matrix.platform }} -v $PWD/moseiik_test_images:/app/moseiik_test_images moseiik:test-${{ matrix.arch }}
 
       - name: Run ground-truth verification test
-        run: docker run --rm --platform ${{ matrix.platform }} moseiik:test-${{ matrix.arch }} --ignored test_ground_truth_kit
+        run: docker run --rm --platform ${{ matrix.platform }} -v $PWD/moseiik_test_images:/app/moseiik_test_images moseiik:test-${{ matrix.arch }} --ignored test_ground_truth_kit
