@@ -64,9 +64,10 @@ jobs:
           # Export to Docker daemon for local testing
           # Note: This works with QEMU for cross-platform builds
           load: true
-          # GitHub Actions cache dramatically improves build times
+          # Cache strategy: inline cache (smaller, embedded in image layers)
+          # This avoids 502 errors from GitHub's cache service while still providing speedup
           cache-from: type=gha,scope=${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=min,scope=${{ matrix.arch }}
 
       # Run all tests including the ground-truth verification test
       # The '--' separator in ENTRYPOINT allows passing test filters
