@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
-      fail-fast: true  # to optimize resource usage
+      fail-fast: false  # to optimize resource usage
       matrix:
         platform:
           - linux/amd64
