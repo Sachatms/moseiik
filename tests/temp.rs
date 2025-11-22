@@ -86,9 +86,12 @@ fn run_integration_test(use_simd: bool, output_path: &str) {
         image: "moseiik_test_images/kit.jpeg".to_string(),
         tiles: "moseiik_test_images/images".to_string(),
         output: output_path.to_string(),
-        num_thread: 4,
+        scaling: 1,
+        tile_size: 5,
+        remove_used: false,
+        verbose: false,
         simd: use_simd,
-        ..Default::default()
+        num_thread: 4,
     };
 
     compute_mosaic(args);
