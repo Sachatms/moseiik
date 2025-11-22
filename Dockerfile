@@ -26,5 +26,5 @@ RUN cargo build --release --tests
 # All tests use this dataset (no assets/ directory needed in the image)
 
 # ENTRYPOINT allows passing test filters as arguments
-# Example: docker run moseiik test_ground_truth_kit
+# Example: docker run moseiik test_generic
 ENTRYPOINT ["cargo", "test", "--release", "--"]
