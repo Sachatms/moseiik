@@ -462,11 +462,11 @@ mod tests {
 
     // Helper to create test images
     fn create_test_images() -> (RgbImage, RgbImage, i32) {
-        let mut im1 = RgbImage::new(4, 4);
-        let mut im2 = RgbImage::new(4, 4);
+        let mut im1 = RgbImage::new(5, 5);
+        let mut im2 = RgbImage::new(5, 5);
         im1.pixels_mut().for_each(|p| *p = image::Rgb([10, 20, 30]));
         im2.pixels_mut().for_each(|p| *p = image::Rgb([15, 25, 35]));
-        let expected_distance = 4 * 4 * (5 + 5 + 5);
+        let expected_distance = 5 * 5 * (5 + 5 + 5);
         (im1, im2, expected_distance)
     }
 
