@@ -19,70 +19,96 @@ impl Drop for TestCleanup {
     }
 }
 
+/// Check if the test dataset is available
+fn dataset_available() -> bool {
+    std::path::Path::new("moseiik_test_images/images").exists()
+        && std::path::Path::new("moseiik_test_images/kit.jpeg").exists()
+        && std::path::Path::new("moseiik_test_images/output.jpeg").exists()
+}
+
 /// Integration test for x86/x86_64 SIMD implementation
-/// Tests complete pipeline with small dataset (target-small.png + tiles-small)
+/// Uses the full moseiik_test_images dataset
 #[test]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 fn test_x86() {
+    if !dataset_available() {
+        eprintln!("⚠️  Skipping test - moseiik_test_images dataset not found");
+        eprintln!(
+            "   Download from: https://nasext-vaader.insa-rennes.fr/ietr-vaader/moseiik_test_images.zip"
+        );
+        return;
+    }
+
     let output = "test_output_x86.png";
     let _cleanup = TestCleanup::new(output);
     run_integration_test(true, output);
 }
 
 /// Integration test for ARM NEON SIMD implementation
-/// Tests complete pipeline with small dataset (target-small.png + tiles-small)
+/// Uses the full moseiik_test_images dataset
 #[test]
 #[cfg(target_arch = "aarch64")]
 fn test_aarch64() {
+    if !dataset_available() {
+        eprintln!("⚠️  Skipping test - moseiik_test_images dataset not found");
+        eprintln!(
+            "   Download from: https://nasext-vaader.insa-rennes.fr/ietr-vaader/moseiik_test_images.zip"
+        );
+        return;
+    }
+
     let output = "test_output_aarch64.png";
     let _cleanup = TestCleanup::new(output);
     run_integration_test(true, output);
 }
 
 /// Integration test for generic (non-SIMD) implementation
-/// Tests complete pipeline with small dataset (target-small.png + tiles-small)
+/// Uses the full moseiik_test_images dataset
 #[test]
 fn test_generic() {
+    if !dataset_available() {
+        eprintln!("⚠️  Skipping test - moseiik_test_images dataset not found");
+        eprintln!(
+            "   Download from: https://nasext-vaader.insa-rennes.fr/ietr-vaader/moseiik_test_images.zip"
+        );
+        return;
+    }
+
     let output = "test_output_generic.png";
     let _cleanup = TestCleanup::new(output);
     run_integration_test(false, output);
 }
 
 /// Helper function for integration tests
-/// Uses small test data (tiles-small, target-small.png) for fast CI testing
+/// Uses the moseiik_test_images dataset (kit.jpeg + images/)
 fn run_integration_test(use_simd: bool, output_path: &str) {
     let args = Options {
-        image: "assets/target-small.png".to_string(),
-        tiles: "assets/tiles-small".to_string(),
-        tile_size: 5,
+        image: "moseiik_test_images/kit.jpeg".to_string(),
+        tiles: "moseiik_test_images/images".to_string(),
         output: output_path.to_string(),
-        verbose: false,
         scaling: 1,
-        num_thread: 4,
-        simd: use_simd,
+        tile_size: 5,
         remove_used: false,
+        verbose: false,
+        simd: use_simd,
+        num_thread: 4,
     };
 
     compute_mosaic(args);
 
     // Verify output exists and can be loaded
-    let output_img = image::open(output_path).expect("Failed to open output");
-
-    // The target-small.png should be reconstructed perfectly since tiles-small
-    // contains the exact tiles from the original image
-    let target_img = image::open("assets/target-small.png")
-        .expect("Failed to open target")
+    let output_img = image::open(output_path)
+        .expect("Failed to open output")
         .into_rgb8();
 
-    // Verify dimensions match (should be exact since tiles divide evenly)
+    // Compare against the reference output.jpeg from the dataset
+    let reference_img = image::open("moseiik_test_images/output.jpeg")
+        .expect("Failed to open reference output")
+        .into_rgb8();
+
+    // Pixel-perfect comparison
     assert_eq!(
-        output_img.width(),
-        target_img.width(),
-        "Output width doesn't match target"
-    );
-    assert_eq!(
-        output_img.height(),
-        target_img.height(),
-        "Output height doesn't match target"
+        output_img, reference_img,
+        "Output should be pixel-perfect identical to reference output"
     );
 }

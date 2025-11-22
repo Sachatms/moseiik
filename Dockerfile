@@ -5,12 +5,25 @@ FROM rust:1.83
 
 WORKDIR /app
 
+# Copy dependency files first for better layer caching
 COPY Cargo.toml Cargo.lock ./
+
+# Create dummy source to cache dependencies
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs && \
+    cargo build --release && \
+    rm -rf src
+
+# Copy actual source code
 COPY src ./src
 COPY tests ./tests
-COPY assets ./assets
 
+# Build tests in release mode (cached if source unchanged)
 RUN cargo build --release --tests
 
-ENTRYPOINT ["cargo", "test"]
-CMD ["--release"]
+# Note: moseiik_test_images dataset is mounted at runtime via -v flag
+# All tests use this dataset (no assets/ directory needed in the image)
+
+# ENTRYPOINT allows passing test filters as arguments
+# Example: docker run moseiik test_generic
+ENTRYPOINT ["cargo", "test", "--release", "--"]
