@@ -12,6 +12,7 @@ COPY Cargo.toml Cargo.lock ./
 # This matches the project structure (lib.rs + main.rs) to maximize cache hits
 RUN mkdir src && \
     echo "fn main() {}" > src/main.rs && \
+    echo "" > src/lib.rs && \
     cargo build --release && \
     rm -rf src
 
