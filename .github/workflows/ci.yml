@@ -69,8 +69,8 @@ jobs:
           # Export to Docker daemon for local testing
           # Note: This works with QEMU for cross-platform builds
           load: true
-          # Cache strategy: inline cache (smaller, embedded in image layers)
-          # This avoids 502 errors from GitHub's cache service while still providing speedup
+          # Cache strategy: GitHub Actions cache service (type=gha)
+          # Uses GHA cache for build layers, scoped per architecture. May be subject to 502 errors.
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=min,scope=${{ matrix.arch }}
 
